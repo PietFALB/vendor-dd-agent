@@ -1,0 +1,311 @@
+{
+  "meta": {
+    "goldenCopy": {
+      "publishDate": "2026-11-09T00:00:00Z"
+    },
+    "pagination": {
+      "currentPage": 1,
+      "perPage": 3,
+      "from": 1,
+      "to": 2,
+      "total": 2,
+      "lastPage": 1
+    }
+  },
+  "links": {
+    "first": "https://api.gleif.org/api/v1/lei-records?filter%5Bfulltext%5D=ING+Groep&page%5Bnumber%5D=1&page%5Bsize%5D=3",
+    "last": "https://api.gleif.org/api/v1/lei-records?filter%5Bfulltext%5D=ING+Groep&page%5Bnumber%5D=1&page%5Bsize%5D=3"
+  },
+  "data": [
+    {
+      "type": "lei-records",
+      "id": "549300NYKK9MWM7GGW15",
+      "attributes": {
+        "lei": "549300NYKK9MWM7GGW15",
+        "entity": {
+          "legalName": {
+            "name": "ING GROEP N.V.",
+            "language": "en"
+          },
+          "otherNames": [
+            {
+              "name": "INTERNATIONALE NEDERLANDEN GROEP N.V.",
+              "language": "nl",
+              "type": "PREVIOUS_LEGAL_NAME"
+            }
+          ],
+          "transliteratedOtherNames": [],
+          "legalAddress": {
+            "language": "nl",
+            "addressLines": [
+              "BIJLMERDREEF 106"
+            ],
+            "addressNumber": null,
+            "addressNumberWithinBuilding": null,
+            "mailRouting": null,
+            "city": "AMSTERDAM",
+            "region": "NL-NH",
+            "country": "NL",
+            "postalCode": "1102 CT"
+          },
+          "headquartersAddress": {
+            "language": "nl",
+            "addressLines": [
+              "BIJLMERDREEF 106"
+            ],
+            "addressNumber": null,
+            "addressNumberWithinBuilding": null,
+            "mailRouting": null,
+            "city": "AMSTERDAM",
+            "region": "NL-NH",
+            "country": "NL",
+            "postalCode": "1102 CT"
+          },
+          "registeredAt": {
+            "id": "RA000463",
+            "other": null
+          },
+          "registeredAs": "33231073",
+          "jurisdiction": "NL",
+          "category": "GENERAL",
+          "legalForm": {
+            "id": "B5PM",
+            "other": null
+          },
+          "associatedEntity": {
+            "lei": null,
+            "name": null
+          },
+          "status": "ACTIVE",
+          "expiration": {
+            "date": null,
+            "reason": null
+          },
+          "successorEntity": {
+            "lei": null,
+            "name": null
+          },
+          "successorEntities": [],
+          "creationDate": "2014-02-06T00:00:00Z",
+          "subCategory": null,
+          "otherAddresses": [],
+          "eventGroups": []
+        },
+        "registration": {
+          "initialRegistrationDate": "2014-02-06T01:27:00Z",
+          "lastUpdateDate": "2026-10-28T08:29:48Z",
+          "status": "ISSUED",
+          "nextRenewalDate": "2027-11-29T00:00:00Z",
+          "managingLou": "213800WAVVOPS85N2205",
+          "corroborationLevel": "FULLY_CORROBORATED",
+          "validatedAt": {
+            "id": "RA000463",
+            "other": null
+          },
+          "validatedAs": "33231073",
+          "otherValidationAuthorities": []
+        },
+        "bic": null,
+        "mic": null,
+        "ocid": "nl/33231073",
+        "qcc": "QNLKN94B42",
+        "gem": "E100002007552",
+        "spglobal": [
+          "383462"
+        ],
+        "conformityFlag": "CONFORMING"
+      },
+      "relationships": {
+        "managing-lou": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/549300NYKK9MWM7GGW15/managing-lou"
+          }
+        },
+        "lei-issuer": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/549300NYKK9MWM7GGW15/lei-issuer"
+          }
+        },
+        "field-modifications": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/549300NYKK9MWM7GGW15/field-modifications"
+          }
+        },
+        "direct-parent": {
+          "links": {
+            "reporting-exception": "https://api.gleif.org/api/v1/lei-records/549300NYKK9MWM7GGW15/direct-parent-reporting-exception"
+          }
+        },
+        "ultimate-parent": {
+          "links": {
+            "reporting-exception": "https://api.gleif.org/api/v1/lei-records/549300NYKK9MWM7GGW15/ultimate-parent-reporting-exception"
+          }
+        },
+        "direct-children": {
+          "links": {
+            "relationship-records": "https://api.gleif.org/api/v1/lei-records/549300NYKK9MWM7GGW15/direct-child-relationships",
+            "related": "https://api.gleif.org/api/v1/lei-records/549300NYKK9MWM7GGW15/direct-children"
+          }
+        },
+        "ultimate-children": {
+          "links": {
+            "relationship-records": "https://api.gleif.org/api/v1/lei-records/549300NYKK9MWM7GGW15/ultimate-child-relationships",
+            "related": "https://api.gleif.org/api/v1/lei-records/549300NYKK9MWM7GGW15/ultimate-children"
+          }
+        },
+        "branches": {
+          "links": {
+            "relationship-records": "https://api.gleif.org/api/v1/lei-records/549300NYKK9MWM7GGW15/branch-relationships",
+            "related": "https://api.gleif.org/api/v1/lei-records/549300NYKK9MWM7GGW15/branches"
+          }
+        },
+        "isins": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/549300NYKK9MWM7GGW15/isins"
+          }
+        }
+      },
+      "links": {
+        "self": "https://api.gleif.org/api/v1/lei-records/549300NYKK9MWM7GGW15"
+      }
+    },
+    {
+      "type": "lei-records",
+      "id": "254900X9FOBJZXUTZM84",
+      "attributes": {
+        "lei": "254900X9FOBJZXUTZM84",
+        "entity": {
+          "legalName": {
+            "name": "ING Groep NV ADRhedged(TM)",
+            "language": "en"
+          },
+          "otherNames": [],
+          "transliteratedOtherNames": [],
+          "legalAddress": {
+            "language": "en",
+            "addressLines": [
+              "C/O CAPITOL SERVICES, INC.",
+              "108 LAKELAND AVE."
+            ],
+            "addressNumber": null,
+            "addressNumberWithinBuilding": null,
+            "mailRouting": null,
+            "city": "DOVER",
+            "region": "US-DE",
+            "country": "US",
+            "postalCode": "19901"
+          },
+          "headquartersAddress": {
+            "language": "en",
+            "addressLines": [
+              "C/O Precidian Funds LLC",
+              "350 Main Street",
+              "Suite 9"
+            ],
+            "addressNumber": null,
+            "addressNumberWithinBuilding": null,
+            "mailRouting": null,
+            "city": "Bedminster",
+            "region": "US-NJ",
+            "country": "US",
+            "postalCode": "07921"
+          },
+          "registeredAt": {
+            "id": "RA000665",
+            "other": null
+          },
+          "registeredAs": "S000089662",
+          "jurisdiction": "US",
+          "category": "FUND",
+          "legalForm": {
+            "id": "8888",
+            "other": "Sub Fund"
+          },
+          "associatedEntity": {
+            "lei": null,
+            "name": null
+          },
+          "status": "ACTIVE",
+          "expiration": {
+            "date": null,
+            "reason": null
+          },
+          "successorEntity": {
+            "lei": null,
+            "name": null
+          },
+          "successorEntities": [],
+          "creationDate": "2025-01-14T00:00:00Z",
+          "subCategory": null,
+          "otherAddresses": [],
+          "eventGroups": []
+        },
+        "registration": {
+          "initialRegistrationDate": "2025-02-26T20:01:32Z",
+          "lastUpdateDate": "2026-01-28T06:35:54Z",
+          "status": "ISSUED",
+          "nextRenewalDate": "2027-02-26T20:01:32Z",
+          "managingLou": "5493001KJTIIGC8Y1R12",
+          "corroborationLevel": "FULLY_CORROBORATED",
+          "validatedAt": {
+            "id": "RA000665",
+            "other": null
+          },
+          "validatedAs": "S000089662",
+          "otherValidationAuthorities": []
+        },
+        "bic": null,
+        "mic": null,
+        "ocid": null,
+        "qcc": null,
+        "gem": null,
+        "spglobal": [
+          "1932195060"
+        ],
+        "conformityFlag": "CONFORMING"
+      },
+      "relationships": {
+        "managing-lou": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/254900X9FOBJZXUTZM84/managing-lou"
+          }
+        },
+        "lei-issuer": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/254900X9FOBJZXUTZM84/lei-issuer"
+          }
+        },
+        "field-modifications": {
+          "links": {
+            "related": "https://api.gleif.org/api/v1/lei-records/254900X9FOBJZXUTZM84/field-modifications"
+          }
+        },
+        "direct-parent": {
+          "links": {
+            "reporting-exception": "https://api.gleif.org/api/v1/lei-records/254900X9FOBJZXUTZM84/direct-parent-reporting-exception"
+          }
+        },
+        "ultimate-parent": {
+          "links": {
+            "reporting-exception": "https://api.gleif.org/api/v1/lei-records/254900X9FOBJZXUTZM84/ultimate-parent-reporting-exception"
+          }
+        },
+        "fund-manager": {
+          "links": {
+            "lei-record": "https://api.gleif.org/api/v1/lei-records/254900X9FOBJZXUTZM84/fund-manager",
+            "relationship-record": "https://api.gleif.org/api/v1/lei-records/254900X9FOBJZXUTZM84/fund-manager-relationship"
+          }
+        },
+        "umbrella-fund": {
+          "links": {
+            "lei-record": "https://api.gleif.org/api/v1/lei-records/254900X9FOBJZXUTZM84/umbrella-fund",
+            "relationship-record": "https://api.gleif.org/api/v1/lei-records/254900X9FOBJZXUTZM84/umbrella-fund-relationship"
+          }
+        }
+      },
+      "links": {
+        "self": "https://api.gleif.org/api/v1/lei-records/254900X9FOBJZXUTZM84"
+      }
+    }
+  ]
+}

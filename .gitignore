@@ -1,0 +1,5 @@
+.venv/
+.env
+data/sanctions/
+__pycache__/
+.DS_Store
