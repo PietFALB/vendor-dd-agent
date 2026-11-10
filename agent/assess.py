@@ -1,0 +1,143 @@
+"""Risk assessment: the LLM judges the evidence in a fixed format; code enforces a rating floor
+and checks that every red flag cites evidence that was actually gathered."""
+import json
+import os
+from typing import Literal
+
+from langchain_openai import ChatOpenAI
+from pydantic import BaseModel, Field
+
+RATINGS = ["Low", "Medium", "High"]
+RECOMMENDATIONS = ["Onboard", "Onboard with conditions", "Escalate"]
+STRONG_HIT = 95  # sanctions score from which a hit sets the floor to High
+
+
+class RedFlag(BaseModel):
+    flag: str = Field(description="Short name of the red flag, e.g. 'Listed on EU sanctions list'")
+    category: Literal["sanctions", "ownership or control", "circumvention", "adverse media",
+                      "identity", "data gap", "other"]
+    severity: Literal["Low", "Medium", "High"]
+    evidence: str = Field(description="One sentence: what the evidence shows")
+    evidence_source: str = Field(description="Exact URL or source name from the EVIDENCE SOURCES list")
+    guidance_ref: str | None = Field(None, description="Exact reference from the GUIDANCE REFERENCES list, or null")
+
+
+class RiskAssessment(BaseModel):
+    rating: Literal["Low", "Medium", "High"]
+    recommendation: Literal["Onboard", "Onboard with conditions", "Escalate"]
+    red_flags: list[RedFlag]
+    rationale: str = Field(description="2-4 sentences explaining the rating, using only the evidence")
+
+
+PROMPT = """You are a senior compliance officer assessing a new vendor before onboarding.
+
+Judge ONLY the evidence below. Rules:
+- No evidence, no flag. Every red flag must cite an exact source from EVIDENCE SOURCES.
+- Use guidance_ref only with an exact entry from GUIDANCE REFERENCES, otherwise null.
+- Sanctions hits on the company itself are the most serious finding. A sanctions red flag must cite
+  the OpenSanctions URL of the hit (from EVIDENCE SOURCES), not a news article.
+- One red flag per event. Several articles about the same event (e.g. one settlement reported by
+  two outlets) go into ONE flag; pick the most authoritative article as the source.
+- Recommendation: 'Escalate' for High. For Medium, choose 'Onboard with conditions' (e.g. enhanced
+  monitoring) unless there is an unresolved, current investigation. 'Onboard' only for Low.
+- Count adverse media only if it is about this company itself, not if it is merely mentioned.
+- Data gaps (listed under LIMITATIONS) are not red flags about the company, but an incomplete check
+  must lower your confidence: never recommend 'Onboard' when sanctions screening was incomplete.
+- Rating guide: High = sanctions exposure or serious recent financial crime; Medium = past enforcement,
+  unresolved investigations, or material data gaps; Low = no relevant findings and complete checks.
+
+EVIDENCE:
+{evidence}
+
+EVIDENCE SOURCES (use exactly):
+{sources}
+
+GUIDANCE REFERENCES (use exactly):
+{refs}"""
+
+
+def _floor(state: dict) -> tuple[str, str, str | None]:
+    """Minimum rating and recommendation that code enforces, with the reason."""
+    for h in state.get("sanctions_hits", []):
+        roles = " ".join(h.get("matched_via", []))
+        if h["score"] >= STRONG_HIT and ("[company]" in roles or "[name as given]" in roles):
+            return "High", "Escalate", f"Strong sanctions match on the company itself ({h['name']}, score {h['score']})."
+    if state.get("sanctions_hits"):
+        return "Medium", "Onboard with conditions", "Possible sanctions match that needs manual review."
+    if not state.get("screening_complete", True):
+        return "Medium", "Onboard with conditions", "Sanctions screening was incomplete."
+    return "Low", "Onboard", None
+
+
+def assess(state: dict) -> dict:
+    entity = state.get("entity") or {}
+    hits = state.get("sanctions_hits", [])
+    news = state.get("news", [])
+    guidance = state.get("guidance", [])
+
+    evidence = {
+        "company": {
+            "name_as_given": state.get("company_name"),
+            "legal_name": entity.get("legal_name"),
+            "country": entity.get("country"),
+            "entity_status": entity.get("entity_status"),
+            "lei": entity.get("lei"),
+            "ultimate_parent": (entity.get("ultimate_parent") or {}).get("legal_name"),
+        },
+        "sanctions_screening_complete": state.get("screening_complete", True),
+        "sanctions_hits": [{"name": h["name"], "score": h["score"], "programs": h["programs"],
+                            "matched_via": h.get("matched_via"), "source": h["url"]} for h in hits],
+        "adverse_media": [{"title": n["title"], "date": n.get("date"), "summary": n["summary"],
+                           "risk_type": n["risk_type"], "source": n["url"]} for n in news],
+        "review_summary": state.get("review_summary"),
+        "guidance": [{"ref": f"{g['source']} p.{g['page']}", "text": g["text"][:400]} for g in guidance],
+        "limitations": state.get("errors", []),
+    }
+    sources = sorted({h["url"] for h in hits} | {n["url"] for n in news}
+                     | {"GLEIF", "KvK", "OpenSanctions"})
+    refs = sorted({f"{g['source']} p.{g['page']}" for g in guidance})
+
+    model = os.environ.get("ASSESS_MODEL") or os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+    llm = ChatOpenAI(model=model, temperature=0).with_structured_output(RiskAssessment)
+
+    errors = []
+    try:
+        result: RiskAssessment = llm.invoke(PROMPT.format(
+            evidence=json.dumps(evidence, ensure_ascii=False, indent=1),
+            sources="\n".join(sources),
+            refs="\n".join(refs) or "(none)",
+        ))
+    except Exception as e:
+        result = None
+        errors.append(f"Assessment: LLM failed ({e}); rating set by code rules only.")
+
+    # Check every red flag against the evidence that was actually gathered
+    flags = []
+    for f in (result.red_flags if result else []):
+        if f.evidence_source not in sources:
+            errors.append(f"Assessment: dropped red flag with unknown source: {f.flag!r}")
+            continue
+        if f.guidance_ref and f.guidance_ref not in refs:
+            errors.append(f"Assessment: removed unverified guidance reference from {f.flag!r}")
+            f.guidance_ref = None
+        flags.append(f.model_dump())
+
+    # Enforce the floor: the LLM may rate higher than the code rules, never lower
+    floor_rating, floor_rec, floor_reason = _floor(state)
+    llm_rating = result.rating if result else floor_rating
+    llm_rec = result.recommendation if result else floor_rec
+    rating = max(llm_rating, floor_rating, key=RATINGS.index)
+    recommendation = max(llm_rec, floor_rec, key=RECOMMENDATIONS.index)
+
+    overridden = result is not None and (rating != llm_rating or recommendation != llm_rec)
+    if overridden:
+        errors.append(f"Assessment: LLM said {llm_rating}/{llm_rec}; raised to {rating}/{recommendation} by rule: {floor_reason}")
+
+    return {
+        "risk_rating": rating,
+        "recommendation": recommendation,
+        "red_flags": flags,
+        "risk_rationale": result.rationale if result else floor_reason,
+        "rating_floor_reason": floor_reason,
+        "errors": errors,
+    }

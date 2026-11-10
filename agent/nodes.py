@@ -5,6 +5,7 @@ from agent.state import DDState
 from tools.gleif import search_gleif
 from tools.kvk import get_kvk_profile
 from tools.sanctions import screen_sanctions
+from agent.assess import assess
 from agent.review import run_review
 
 # ---------------------------------------------------------------- 1. validate
@@ -143,7 +144,7 @@ def standard_review(state: DDState) -> dict:
     return {**out, "trace": ["standard_review"]}
 
 def assess_risk(state: DDState) -> dict:
-    return {"trace": ["assess_risk"]}
+    return {**assess(state), "trace": ["assess_risk"]}
 
 
 def write_report(state: DDState) -> dict:

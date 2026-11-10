@@ -20,6 +20,9 @@ class DDState(TypedDict, total=False):
     # Judgement (from LLM)
     red_flags: list[dict]
     risk_rating: str | None      # Low / Medium / High
+    recommendation: str | None   # Onboard / Onboard with conditions / Escalate
+    risk_rationale: str | None
+    rating_floor_reason: str | None  # code rule that set a minimum rating, if any
 
     # Output
     report: str | None
