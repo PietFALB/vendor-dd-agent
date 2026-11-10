@@ -1,12 +1,14 @@
-"""Graph nodes. Steps 1-3 real (Day 3 morning); the rest are still stubs."""
+"""Graph nodes for the vendor due-diligence agent."""
 import re
 
+from agent import report as rpt
+from agent.assess import assess
+from agent.review import run_review
 from agent.state import DDState
 from tools.gleif import search_gleif
 from tools.kvk import get_kvk_profile
 from tools.sanctions import screen_sanctions
-from agent.assess import assess
-from agent.review import run_review
+
 
 # ---------------------------------------------------------------- 1. validate
 
@@ -14,12 +16,10 @@ def validate_input(state: DDState) -> dict:
     name = (state.get("company_name") or "").strip()
     kvk = (state.get("kvk_number") or "").strip() or None
     problems = []
-
     if len(name) < 2:
         problems.append("Company name is empty or too short.")
     if kvk and not re.fullmatch(r"\d{8}", kvk):
         problems.append(f"KvK number {kvk!r} must be 8 digits.")
-
     return {
         "company_name": name,
         "kvk_number": kvk,
@@ -35,7 +35,6 @@ def resolve_entity(state: DDState) -> dict:
     name = state["company_name"]
     errors, sources = [], []
 
-    # a) GLEIF: legal identity and parents
     gleif = search_gleif(name)
     sources.append(gleif.source)
     match = gleif.data.get("match") if gleif.ok else None
@@ -49,12 +48,10 @@ def resolve_entity(state: DDState) -> dict:
             f"may not be the company searched for. Verify identity manually."
         )
 
-    # b) KvK number: from the user, or from GLEIF for Dutch entities
     kvk_number = state.get("kvk_number")
     if not kvk_number and match and match.get("jurisdiction") == "NL":
         kvk_number = match.get("registered_as")
 
-    # c) KvK profile
     kvk_profile = None
     if kvk_number:
         kvk = get_kvk_profile(kvk_number)
@@ -92,8 +89,7 @@ def resolve_entity(state: DDState) -> dict:
 def screen_sanctions_node(state: DDState) -> dict:
     entity = state.get("entity") or {}
 
-    # Who to screen, and in what role. The name as given is always screened,
-    # so a wrong GLEIF match can never produce a false "clean".
+    # The name as given is always screened, so a wrong GLEIF match can never produce a false "clean"
     targets = [(entity.get("legal_name") or state["company_name"], "company")]
     targets.append((state["company_name"], "name as given"))
     targets += [(n, "former or other name") for n in entity.get("other_names", [])]
@@ -102,12 +98,12 @@ def screen_sanctions_node(state: DDState) -> dict:
         if parent and parent.get("legal_name"):
             targets.append((parent["legal_name"], role))
 
-    hits, errors, seen_names, complete = [], [], set(), True
+    hits, errors, seen, screened, complete = [], [], set(), [], True
     for name, role in targets:
-        if name.lower() in seen_names:
+        if name.lower() in seen:
             continue
-        seen_names.add(name.lower())
-
+        seen.add(name.lower())
+        screened.append(f"{name} [{role}]")
         result = screen_sanctions(name)
         if not result.ok:
             errors.append(result.error)
@@ -116,7 +112,7 @@ def screen_sanctions_node(state: DDState) -> dict:
         for hit in result.data["hits"]:
             hits.append({"screened": name, "role": role, **hit})
 
-    # Merge duplicates: one entry per sanctioned entity, listing every name that matched it
+    # One entry per sanctioned entity, listing every name that matched it
     merged = {}
     for h in hits:
         entry = merged.setdefault(h["id"], {**h, "matched_via": [], "score": 0})
@@ -126,13 +122,14 @@ def screen_sanctions_node(state: DDState) -> dict:
 
     return {
         "sanctions_hits": hits,
+        "screened_names": screened,
         "screening_complete": complete,
         "errors": errors,
         "trace": ["screen_sanctions"],
     }
 
 
-# ---------------------------------------------------------------- stubs (later today)
+# ---------------------------------------------------------------- 4. review
 
 def enhanced_review(state: DDState) -> dict:
     out = run_review(state["company_name"], state.get("entity"), hits=state.get("sanctions_hits"))
@@ -143,20 +140,32 @@ def standard_review(state: DDState) -> dict:
     out = run_review(state["company_name"], state.get("entity"), hits=None)
     return {**out, "trace": ["standard_review"]}
 
+
+# ---------------------------------------------------------------- 5. assess
+
 def assess_risk(state: DDState) -> dict:
     return {**assess(state), "trace": ["assess_risk"]}
 
 
+# ---------------------------------------------------------------- 6. report
+
 def write_report(state: DDState) -> dict:
-    return {"trace": ["write_report"]}
+    return {"report": rpt.build_report(state), "trace": ["write_report"]}
 
 
 def check_report(state: DDState) -> dict:
-    return {"trace": ["check_report"], "check_attempts": state.get("check_attempts", 0) + 1}
+    problems = rpt.check_report(state)
+    return {
+        "report_ok": not problems,
+        "check_problems": problems,
+        "check_attempts": state.get("check_attempts", 0) + 1,
+        "trace": ["check_report"],
+    }
 
 
 def save_report(state: DDState) -> dict:
-    return {"trace": ["save_report"]}
+    path = rpt.save_report(state, ok=state.get("report_ok", False))
+    return {"report_path": path, "trace": ["save_report"]}
 
 
 # ---------------------------------------------------------------- routers
@@ -170,6 +179,6 @@ def route_after_screening(state: DDState) -> str:
 
 
 def route_after_check(state: DDState) -> str:
-    if state.get("report") or state.get("check_attempts", 0) >= 2:
+    if state.get("report_ok") or state.get("check_attempts", 0) >= 2:
         return "save"
     return "rewrite"

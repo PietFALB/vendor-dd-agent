@@ -14,6 +14,7 @@ class DDState(TypedDict, total=False):
     sanctions_hits: list[dict]   # hits on company and parents
     news: list[dict]             # adverse media articles
     guidance: list[dict]         # retrieved RAG chunks with source + page
+    evidence_texts: list[str]    # raw article titles + snippets, for the number check
     review_summary: str | None   # the review agent's overall conclusion
     agent_steps: list[dict]      # which searches the agent chose (audit trail)
 
@@ -28,6 +29,9 @@ class DDState(TypedDict, total=False):
     report: str | None
     report_path: str | None
     check_attempts: int
+    report_ok: bool              # set by check_report
+    check_problems: list[str]    # what check_report found missing (fed back on rewrite)
+    screened_names: list[str]    # every name screened, with its role
 
     # Audit trail: lists that every node appends to
     errors: Annotated[list[str], operator.add]

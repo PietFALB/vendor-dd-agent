@@ -8,8 +8,8 @@ from tools.base import ToolResult
 TERMS = "fraud OR sanctions OR investigation OR lawsuit OR fine OR corruption OR money laundering"
 
 
-def search_news(name: str, max_results: int = 5) -> ToolResult:
-    query = f'"{name}" {TERMS}'
+def search_news(name: str, focus: str | None = None, max_results: int = 5) -> ToolResult:
+    query = f'"{name}" {focus}' if focus else f'"{name}" {TERMS}'
     try:
         client = TavilyClient(api_key=os.environ["TAVILY_API_KEY"])
         res = client.search(query, topic="news", max_results=max_results)

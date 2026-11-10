@@ -15,6 +15,7 @@ from langgraph.errors import GraphRecursionError
 from pydantic import BaseModel, Field
 
 from rag.retrieve import retrieve
+from tools.amounts import unverified_amounts
 from tools.news import search_news
 from tools.sanctions import normalize
 
@@ -109,6 +110,7 @@ Rules:
 - A finding must be about THIS company itself, or name it as a party. Skip articles about other firms.
 - Skip articles that are not negative (share price, product news).
 - Copy URLs exactly from the articles. Never invent articles, dates or facts.
+- Never add up, convert or calculate amounts. Only use amounts exactly as they appear in the articles.
 - Link each finding to the most relevant guidance passage (file name and page), if one applies.
 - The summary may only use facts from your findings.
 - If nothing credible remains, set no_adverse_media to true and return an empty findings list.
@@ -211,6 +213,7 @@ def run_review(company: str, entity: dict | None, hits: list[dict] | None = None
 
     # ---- Code checks: the URL must come from the news tool, and the article must name the company.
     names = [company, entity.get("legal_name") or "", *entity.get("other_names", [])]
+    evidence_texts = [f"{a.get('title', '')} {a.get('snippet', '')}" for a in articles.values()]
     findings = []
     for f in (review.findings if review else []):
         source = articles.get(f.url)
@@ -219,12 +222,23 @@ def run_review(company: str, entity: dict | None, hits: list[dict] | None = None
         elif not _mentions_company(f"{source.get('title', '')} {source.get('snippet', '')}", names):
             errors.append(f"Review: dropped finding not about this company: {f.title!r}")
         else:
-            findings.append(f.model_dump())
+            item = f.model_dump()
+            bad = unverified_amounts(f.summary, evidence_texts)
+            if bad:
+                errors.append(f"Review: amount(s) {bad} not in source; summary of {f.title!r} replaced by source excerpt")
+                item["summary"] = (source.get("snippet") or "")[:300]
+            findings.append(item)
+
+    summary = review.summary if review else None
+    if summary and unverified_amounts(summary, evidence_texts):
+        errors.append("Review: summary contained amounts not in the sources; summary removed")
+        summary = None
 
     return {
         "news": findings,
         "guidance": list(guidance.values()),
-        "review_summary": review.summary if review else None,
+        "review_summary": summary,
         "agent_steps": steps,
+        "evidence_texts": evidence_texts,
         "errors": errors,
     }

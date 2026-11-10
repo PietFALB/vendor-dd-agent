@@ -7,6 +7,8 @@ from typing import Literal
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 
+from tools.amounts import unverified_amounts
+
 RATINGS = ["Low", "Medium", "High"]
 RECOMMENDATIONS = ["Onboard", "Onboard with conditions", "Escalate"]
 STRONG_HIT = 95  # sanctions score from which a hit sets the floor to High
@@ -20,6 +22,7 @@ class RedFlag(BaseModel):
     evidence: str = Field(description="One sentence: what the evidence shows")
     evidence_source: str = Field(description="Exact URL or source name from the EVIDENCE SOURCES list")
     guidance_ref: str | None = Field(None, description="Exact reference from the GUIDANCE REFERENCES list, or null")
+    event_year: int | None = Field(None, description="Year the underlying event happened, from the evidence")
 
 
 class RiskAssessment(BaseModel):
@@ -33,6 +36,8 @@ PROMPT = """You are a senior compliance officer assessing a new vendor before on
 
 Judge ONLY the evidence below. Rules:
 - No evidence, no flag. Every red flag must cite an exact source from EVIDENCE SOURCES.
+- Never add up, convert or calculate amounts. Use amounts exactly as they appear in the evidence.
+- Give each red flag the year of the underlying event (event_year), if the evidence shows it.
 - Use guidance_ref only with an exact entry from GUIDANCE REFERENCES, otherwise null.
 - Sanctions hits on the company itself are the most serious finding. A sanctions red flag must cite
   the OpenSanctions URL of the hit (from EVIDENCE SOURCES), not a news article.
@@ -90,6 +95,7 @@ def assess(state: dict) -> dict:
         "adverse_media": [{"title": n["title"], "date": n.get("date"), "summary": n["summary"],
                            "risk_type": n["risk_type"], "source": n["url"]} for n in news],
         "review_summary": state.get("review_summary"),
+        "article_excerpts": [t[:400] for t in state.get("evidence_texts", [])],
         "guidance": [{"ref": f"{g['source']} p.{g['page']}", "text": g["text"][:400]} for g in guidance],
         "limitations": state.get("errors", []),
     }
@@ -120,7 +126,26 @@ def assess(state: dict) -> dict:
         if f.guidance_ref and f.guidance_ref not in refs:
             errors.append(f"Assessment: removed unverified guidance reference from {f.flag!r}")
             f.guidance_ref = None
+        bad = unverified_amounts(f.evidence, state.get("evidence_texts", []))
+        if bad:
+            errors.append(f"Assessment: amount(s) {bad} not in the evidence; evidence text of {f.flag!r} cleared")
+            f.evidence = "See source."
         flags.append(f.model_dump())
+
+    # Merge red flags about the same event (same category and year), keeping all sources
+    merged = {}
+    for f in flags:
+        key = (f["category"], f["event_year"]) if f.get("event_year") else (f["category"], f["flag"].lower())
+        if key in merged:
+            m = merged[key]
+            m["other_sources"].append(f["evidence_source"])
+            if RATINGS.index(f["severity"]) > RATINGS.index(m["severity"]):
+                m["severity"] = f["severity"]
+            m["guidance_ref"] = m.get("guidance_ref") or f.get("guidance_ref")
+            errors.append(f"Assessment: merged red flag {f['flag']!r} into {m['flag']!r} (same event)")
+        else:
+            merged[key] = {**f, "other_sources": []}
+    flags = list(merged.values())
 
     # Enforce the floor: the LLM may rate higher than the code rules, never lower
     floor_rating, floor_rec, floor_reason = _floor(state)
