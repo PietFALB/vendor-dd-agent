@@ -5,7 +5,7 @@ from agent.state import DDState
 from tools.gleif import search_gleif
 from tools.kvk import get_kvk_profile
 from tools.sanctions import screen_sanctions
-
+from agent.review import run_review
 
 # ---------------------------------------------------------------- 1. validate
 
@@ -134,12 +134,13 @@ def screen_sanctions_node(state: DDState) -> dict:
 # ---------------------------------------------------------------- stubs (later today)
 
 def enhanced_review(state: DDState) -> dict:
-    return {"trace": ["enhanced_review"]}
+    out = run_review(state["company_name"], state.get("entity"), hits=state.get("sanctions_hits"))
+    return {**out, "trace": ["enhanced_review"]}
 
 
 def standard_review(state: DDState) -> dict:
-    return {"trace": ["standard_review"]}
-
+    out = run_review(state["company_name"], state.get("entity"), hits=None)
+    return {**out, "trace": ["standard_review"]}
 
 def assess_risk(state: DDState) -> dict:
     return {"trace": ["assess_risk"]}

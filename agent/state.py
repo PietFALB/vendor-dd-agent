@@ -14,6 +14,8 @@ class DDState(TypedDict, total=False):
     sanctions_hits: list[dict]   # hits on company and parents
     news: list[dict]             # adverse media articles
     guidance: list[dict]         # retrieved RAG chunks with source + page
+    review_summary: str | None   # the review agent's overall conclusion
+    agent_steps: list[dict]      # which searches the agent chose (audit trail)
 
     # Judgement (from LLM)
     red_flags: list[dict]
