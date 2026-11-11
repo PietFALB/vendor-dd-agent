@@ -6,7 +6,7 @@
 
 **Risk rating: Medium** · **Recommendation: Escalate**
 
-Xyzzy Holding BV has a medium risk rating due to the inability to verify the company's identity, as there is no LEI record in GLEIF and no company register profile found for the name as given. There are no relevant findings or adverse media related to the company, and the sanctions screening is complete with no hits. However, the lack of verified identity raises concerns about the company's compliance status.
+Xyzzy Holding BV has undergone complete sanctions screening with no hits found, and there are no adverse media reports or unresolved investigations related to the company. However, the company identity could not be verified due to the absence of a LEI record and no company register profile found for the name as given. This limitation raises the risk rating to Medium, indicating a need for further scrutiny before onboarding.
 
 ## 2. Identity
 
@@ -36,7 +36,7 @@ No matches above the threshold.
 
 ## 5. Adverse media
 
-No credible adverse media found (4 news searches).
+No credible adverse media found (1 news searches).
 
 ## 6. Red flags
 
@@ -48,7 +48,7 @@ No credible adverse media found (4 news searches).
 
 **Escalate** (risk rating Medium)
 
-It is recommended to escalate the onboarding decision due to the unverified identity of Xyzzy Holding BV. Further investigation is necessary to confirm the legitimacy of the company before proceeding with any business relationship.
+It is recommended to escalate the onboarding process for Xyzzy Holding BV due to the inability to verify the company's identity. Additional verification steps should be taken to ensure compliance and mitigate potential risks.
 
 *Minimum rating set by rule: Identity not verified: no LEI record and no company register profile found.*
 
@@ -56,7 +56,7 @@ Next steps:
 - Do not proceed until the compliance officer has reviewed the findings and signed off.
 - Ask the vendor for an explanation and supporting documents for each red flag.
 - Record the decision and its rationale in the vendor file.
-- Request additional documentation to verify the identity of Xyzzy Holding BV.
+- Request documentation to verify the identity of Xyzzy Holding BV.
 
 ## 8. Data limitations and disclaimer
 
