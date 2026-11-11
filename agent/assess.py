@@ -92,7 +92,8 @@ def _floor(state: dict) -> tuple[str, str, str | None]:
             else:
                 rules.append(("High", "Escalate",
                               f"Strong sanctions match on the company itself ({h['name']}, score {h['score']})."))
-    if state.get("sanctions_hits") and not rules:
+    real_hits = [h for h in state.get("sanctions_hits", []) if not h.get("likely_false_positive")]
+    if real_hits and not rules:
         rules.append(("Medium", "Escalate", "Possible sanctions match that needs manual review before onboarding."))
     if not state.get("screening_complete", True):
         rules.append(("Medium", "Escalate", "Sanctions screening was incomplete; complete it before onboarding."))
@@ -178,10 +179,12 @@ def assess(state: dict) -> dict:
         strong = h["score"] >= STRONG_HIT and ("[company]" in via or "[name as given]" in via)
         code_flags.append({
             "flag": f"Listed under sanctions programs: {h['programs']}" if strong
+                    else f"Name similar to a sanctioned entity in another country, likely false positive: {h['name']}"
+                    if h.get("likely_false_positive")
                     else f"Possible sanctions match, verify: {h['name']}",
             "category": "sanctions",
-            "severity": "High" if strong else "Medium",
-            "evidence": f"{h['name']} matched at score {h['score']} via {via}.",
+            "severity": "High" if strong else "Low" if h.get("likely_false_positive") else "Medium",
+            "evidence": f"{h['name']} ({h.get('countries') or 'country unknown'}) matched at score {h['score']} via {via}.",
             "evidence_source": h["url"],
             "guidance_ref": freeze_ref,
             "event_year": None,

@@ -202,12 +202,13 @@ def build_report(state: dict) -> str:
     screened = "; ".join(state.get("screened_names", [])) or "—"
     lines += [f"Names screened: {screened}. Match threshold: 85/100.", ""]
     if hits:
-        lines += ["| Listed entity | Score | Programs | Matched via | Source |",
-                  "| --- | --- | --- | --- | --- |"]
+        lines += ["| Listed entity | Country | Score | Programs | Matched via | Note | Source |",
+                  "| --- | --- | --- | --- | --- | --- | --- |"]
         for h in hits:
             via = "; ".join(h.get("matched_via", []))
-            lines.append(f"| {_cell(h['name'])} | {h['score']} | {_cell(h['programs'])} | "
-                         f"{_cell(via)} | [OpenSanctions]({h['url']}) |")
+            note = "Likely false positive (different country)" if h.get("likely_false_positive") else ""
+            lines.append(f"| {_cell(h['name'])} | {_cell(h.get('countries'))} | {h['score']} | {_cell(h['programs'])} | "
+                         f"{_cell(via)} | {_cell(note)} | [OpenSanctions]({h['url']}) |")
     else:
         lines.append("No matches above the threshold.")
     lines.append("")

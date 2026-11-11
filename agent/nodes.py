@@ -124,6 +124,13 @@ def screen_sanctions_node(state: DDState) -> dict:
         entry["score"] = max(entry["score"], h["score"])
     hits = sorted(merged.values(), key=lambda h: h["score"], reverse=True)
 
+    # Second step of screening: clear fuzzy hits with a secondary identifier (country)
+    company_country = (entity.get("country") or "").lower()
+    for h in hits:
+        hit_countries = {c for c in h.get("countries", "").lower().split(";") if c}
+        h["country_mismatch"] = bool(company_country and hit_countries and company_country not in hit_countries)
+        h["likely_false_positive"] = bool(h["country_mismatch"] and h["score"] < 95 and entity.get("lei"))
+
     return {
         "sanctions_hits": hits,
         "screened_names": screened,
@@ -179,7 +186,8 @@ def route_after_validate(state: DDState) -> str:
 
 
 def route_after_screening(state: DDState) -> str:
-    return "enhanced" if state.get("sanctions_hits") else "standard"
+    real = [h for h in state.get("sanctions_hits", []) if not h.get("likely_false_positive")]
+    return "enhanced" if real else "standard"
 
 
 def route_after_check(state: DDState) -> str:
