@@ -56,7 +56,7 @@ Next steps:
 - Do not proceed until the compliance officer has reviewed the findings and signed off.
 - Ask the vendor for an explanation and supporting documents for each red flag.
 - Record the decision and its rationale in the vendor file.
-- Request documentation to verify the identity of Xyzzy Holding BV.
+- Request documentation to verify the company's identity and clarify the absence of a LEI record.
 
 ## 8. Data limitations and disclaimer
 
