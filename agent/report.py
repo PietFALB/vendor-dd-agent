@@ -92,6 +92,20 @@ def _prose(state: dict) -> ReportProse:
         )
 
 
+def _latin(s: str) -> bool:
+    """True if every letter is in the Latin script (incl. accents)."""
+    return not any(c.isalpha() and ord(c) > 0x24F for c in (s or ""))
+
+
+def _title(state: dict, entity: dict, legal_name: str) -> str:
+    if _latin(legal_name):
+        return legal_name
+    for alt in [*entity.get("other_names", []), state["company_name"]]:
+        if alt and _latin(alt):
+            return f"{alt} ({legal_name})"
+    return legal_name
+
+
 def build_report(state: dict) -> str:
     entity = state.get("entity") or {}
     name = entity.get("legal_name") or state["company_name"]
@@ -110,7 +124,7 @@ def build_report(state: dict) -> str:
         kvk_text = "Not available"
 
     lines = [
-        f"# Vendor Due-Diligence Report: {name}",
+        f"# Vendor Due-Diligence Report: {_title(state, entity, name)}",
         "",
         f"*Generated {date.today().isoformat()} · Review route: {route} · "
         f"Sources: GLEIF, KvK, OpenSanctions (sanctions data as of {data_date}), "

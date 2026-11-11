@@ -48,6 +48,10 @@ def resolve_entity(state: DDState) -> dict:
             f"may not be the company searched for. Verify identity manually."
         )
 
+    if match and not match.get("direct_parent") and not match.get("ultimate_parent"):
+        errors.append("Ownership: no parent reported to GLEIF; ownership and ultimate beneficial owners "
+                      "(UBOs) are not verified. Obtain a UBO declaration.")
+
     kvk_number = state.get("kvk_number")
     if not kvk_number and match and match.get("jurisdiction") == "NL":
         kvk_number = match.get("registered_as")

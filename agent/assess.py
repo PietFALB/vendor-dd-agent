@@ -2,15 +2,17 @@
 and checks that every red flag cites evidence that was actually gathered."""
 import json
 import os
+import re
 from typing import Literal
 
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 
+from rag.retrieve import retrieve
 from tools.amounts import unverified_amounts
 
 RATINGS = ["Low", "Medium", "High"]
-RECOMMENDATIONS = ["Onboard", "Onboard with conditions", "Escalate"]
+RECOMMENDATIONS = ["Onboard", "Onboard with conditions", "Escalate", "Do not onboard"]
 STRONG_HIT = 95  # sanctions score from which a hit sets the floor to High
 
 
@@ -27,7 +29,7 @@ class RedFlag(BaseModel):
 
 class RiskAssessment(BaseModel):
     rating: Literal["Low", "Medium", "High"]
-    recommendation: Literal["Onboard", "Onboard with conditions", "Escalate"]
+    recommendation: Literal["Onboard", "Onboard with conditions", "Escalate", "Do not onboard"]
     red_flags: list[RedFlag]
     rationale: str = Field(description="2-4 sentences explaining the rating, using only the evidence")
 
@@ -39,12 +41,13 @@ Judge ONLY the evidence below. Rules:
 - Never add up, convert or calculate amounts. Use amounts exactly as they appear in the evidence.
 - Give each red flag the year of the underlying event (event_year), if the evidence shows it.
 - Use guidance_ref only with an exact entry from GUIDANCE REFERENCES, otherwise null.
-- Sanctions hits on the company itself are the most serious finding. A sanctions red flag must cite
-  the OpenSanctions URL of the hit (from EVIDENCE SOURCES), not a news article.
+- Sanctions hits are shown in the evidence, but do NOT create sanctions red flags yourself:
+  code adds one per hit. Add the OTHER flags (circumvention, ownership or control, adverse media, identity).
 - One red flag per event. Several articles about the same event (e.g. one settlement reported by
   two outlets) go into ONE flag; pick the most authoritative article as the source.
 - Recommendation: 'Escalate' for High. For Medium, choose 'Onboard with conditions' (e.g. enhanced
   monitoring) unless there is an unresolved, current investigation. 'Onboard' only for Low.
+  'Do not onboard' is set by code for entities listed under EU or UK sanctions.
 - Count adverse media only if it is about this company itself, not if it is merely mentioned.
 - Data gaps (listed under LIMITATIONS) are not red flags about the company, but an incomplete check
   must lower your confidence: never recommend 'Onboard' when sanctions screening was incomplete.
@@ -61,11 +64,25 @@ GUIDANCE REFERENCES (use exactly):
 {refs}"""
 
 
+def _freeze_guidance() -> str | None:
+    """Reference to the guidance passage on asset freezes, for code-made sanctions flags."""
+    try:
+        hits = retrieve("prohibition on making funds or economic resources available to a listed person or entity, asset freeze", k=4)
+    except Exception:
+        return None
+    preferred = [h for h in hits if h["source"].startswith("ec_faq")] or hits
+    return f"{preferred[0]['source']} p.{preferred[0]['page']}" if preferred else None
+
+
 def _floor(state: dict) -> tuple[str, str, str | None]:
     """Minimum rating and recommendation that code enforces, with the reason."""
     for h in state.get("sanctions_hits", []):
         roles = " ".join(h.get("matched_via", []))
         if h["score"] >= STRONG_HIT and ("[company]" in roles or "[name as given]" in roles):
+            if re.search(r"\b(EU|GB)-", h.get("programs", "")):
+                return ("High", "Do not onboard",
+                        f"Strong match on an EU/UK-listed entity ({h['name']}, score {h['score']}); "
+                        "making funds or economic resources available to it is prohibited.")
             return "High", "Escalate", f"Strong sanctions match on the company itself ({h['name']}, score {h['score']})."
     if state.get("sanctions_hits"):
         return "Medium", "Onboard with conditions", "Possible sanctions match that needs manual review."
@@ -131,6 +148,26 @@ def assess(state: dict) -> dict:
             errors.append(f"Assessment: amount(s) {bad} not in the evidence; evidence text of {f.flag!r} cleared")
             f.evidence = "See source."
         flags.append(f.model_dump())
+
+    # Sanctions red flags are made by code, one per hit; any LLM sanctions flags are replaced
+    flags = [f for f in flags if f["category"] != "sanctions"]
+    hits_for_flags = state.get("sanctions_hits", [])
+    freeze_ref = _freeze_guidance() if hits_for_flags else None
+    code_flags = []
+    for h in hits_for_flags:
+        via = "; ".join(h.get("matched_via", []))
+        strong = h["score"] >= STRONG_HIT and ("[company]" in via or "[name as given]" in via)
+        code_flags.append({
+            "flag": f"Listed under sanctions programs: {h['programs']}" if strong
+                    else f"Possible sanctions match, verify: {h['name']}",
+            "category": "sanctions",
+            "severity": "High" if strong else "Medium",
+            "evidence": f"{h['name']} matched at score {h['score']} via {via}.",
+            "evidence_source": h["url"],
+            "guidance_ref": freeze_ref,
+            "event_year": None,
+        })
+    flags = code_flags + flags
 
     # Merge red flags about the same event (same category and year), keeping all sources
     merged = {}
