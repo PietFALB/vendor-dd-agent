@@ -7,9 +7,11 @@ from datetime import date, datetime
 from pathlib import Path
 
 from langchain_openai import ChatOpenAI
+from rapidfuzz import fuzz
 from pydantic import BaseModel, Field
 
 from tools.amounts import unverified_amounts
+from tools.dates import age_text
 from tools.sanctions import CSV
 
 SECTIONS = [
@@ -26,12 +28,36 @@ DISCLAIMER = ("This report is an automated pre-screening to support, not replace
               "compliance officer. It is not legal advice. Verify material findings at the source.")
 
 
+STANDARD_STEPS = {
+    "Do not onboard": [
+        "Do not enter into the relationship and make no payments or other funds available to the entity.",
+        "Inform the compliance officer and legal counsel, and record the sanctions hit and this report in the vendor file.",
+        "If the entity is already a vendor, put pending payments on hold and obtain legal advice on any reporting obligations.",
+    ],
+    "Escalate": [
+        "Do not proceed until the compliance officer has reviewed the findings and signed off.",
+        "Ask the vendor for an explanation and supporting documents for each red flag.",
+        "Record the decision and its rationale in the vendor file.",
+    ],
+    "Onboard with conditions": [
+        "Obtain a UBO declaration and a recent extract from the company register.",
+        "Ask the vendor how past findings were remediated, with supporting evidence.",
+        "Apply enhanced monitoring: rescreen sanctions and adverse media every 6 months.",
+    ],
+    "Onboard": [
+        "Record this check in the vendor file.",
+        "Rescreen sanctions annually, and on any change in ownership.",
+    ],
+}
+
+
 class ReportProse(BaseModel):
     summary: str = Field(description="3-4 sentences for a busy compliance officer: who the company is, "
                                      "the key findings and the rating")
     recommendation_text: str = Field(description="2-3 sentences explaining the recommendation")
-    next_steps: list[str] = Field(description="2-4 concrete actions or onboarding conditions, "
-                                              "e.g. 'Obtain a UBO declaration'")
+    specific_steps: list[str] = Field(description="0-2 extra steps tied to a specific finding in this report, "
+                                                  "e.g. 'Ask for the status of the Payvision investigation'. "
+                                                  "No generic advice.")
 
 
 PROSE_PROMPT = """You write the summary and recommendation of a vendor due-diligence report.
@@ -40,6 +66,7 @@ Never add up, convert or calculate amounts. Only repeat amounts exactly as they 
 Each red flag below is ONE event. Describe each event once, even if several articles or amounts
 belong to it (e.g. a fine plus disgorgement in one settlement is one settlement, not two fines).
 Use the event year; do not call an event 'current' or 'ongoing' unless the evidence says so.
+Specific steps must refer to a finding in this report. Standard onboarding steps are added separately.
 
 Company: {name}
 Risk rating: {rating}
@@ -88,7 +115,7 @@ def _prose(state: dict) -> ReportProse:
         return ReportProse(
             summary=state.get("risk_rationale") or "Automated summary unavailable.",
             recommendation_text=f"Recommendation based on code rules: {state.get('recommendation')}.",
-            next_steps=["Review the findings in sections 4-6 manually."],
+            specific_steps=[],
         )
 
 
@@ -189,7 +216,7 @@ def build_report(state: dict) -> str:
     if news:
         for n in news:
             ref = f" Guidance: {n['guidance_source']} p.{n['guidance_page']}." if n.get("guidance_source") else ""
-            lines.append(f"- **{n['title']}** ({n.get('date') or 'no date'}, {n['risk_type']}). "
+            lines.append(f"- **{n['title']}** ({age_text(n.get('date'))}, {n['risk_type']}). "
                          f"{n['summary']}{ref} [Source]({n['url']})")
     else:
         lines.append(f"No credible adverse media found ({searches} news searches).")
@@ -198,13 +225,13 @@ def build_report(state: dict) -> str:
     # 6. Red flags
     lines += [SECTIONS[5], ""]
     if flags:
-        lines += ["| Severity | Red flag | Evidence | Source | Guidance |",
-                  "| --- | --- | --- | --- | --- |"]
+        lines += ["| Severity | Year | Red flag | Evidence | Source | Guidance |",
+                  "| --- | --- | --- | --- | --- | --- |"]
         for f in flags:
             src = f["evidence_source"]
             src_cell = f"[{src}]({src})" if src.startswith("http") else src
             src_cell += "".join(f" · [source {i + 2}]({s})" for i, s in enumerate(f.get("other_sources", [])))
-            lines.append(f"| {f['severity']} | {_cell(f['flag'])} | {_cell(f['evidence'])} | "
+            lines.append(f"| {f['severity']} | {_cell(f.get('event_year'))} | {_cell(f['flag'])} | {_cell(f['evidence'])} | "
                          f"{src_cell} | {_cell(f.get('guidance_ref'))} |")
     else:
         lines.append("No red flags identified.")
@@ -217,7 +244,12 @@ def build_report(state: dict) -> str:
     if state.get("rating_floor_reason"):
         lines += [f"*Minimum rating set by rule: {state['rating_floor_reason']}*", ""]
     lines.append("Next steps:")
-    lines += [f"- {s}" for s in prose.next_steps]
+    lines += [f"- {s}" for s in STANDARD_STEPS.get(state.get("recommendation"), [])]
+    standard = STANDARD_STEPS.get(state.get("recommendation"), [])
+    for s in prose.specific_steps:
+        repeats = any(fuzz.token_set_ratio(s.lower(), t.lower()) >= 70 for t in standard)
+        if not repeats and not ("ubo" in s.lower() and any("ubo" in t.lower() for t in standard)):
+            lines.append(f"- {s}")
     lines.append("")
 
     # 8. Data limitations and disclaimer

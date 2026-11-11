@@ -19,6 +19,7 @@ from tools.amounts import unverified_amounts
 from tools.news import search_news
 from tools.sanctions import normalize
 
+SETTLED_WORDS = ("settle", "settled", "fined", "agreed to pay", "paid a fine", "penalty")
 MAX_STEPS = 20     # hard safety net for the research loop
 MAX_SEARCHES = 6   # tool budget per review
 _calls = {"n": 0}
@@ -62,7 +63,7 @@ class Finding(BaseModel):
     summary: str = Field(description="What happened to THIS company, 1-2 sentences, only from the article")
     risk_type: Literal[
         "sanctions", "ownership or control", "circumvention", "fraud", "corruption",
-        "money laundering", "regulatory fine", "litigation", "other",
+        "money laundering", "regulatory fine", "investigation", "litigation", "other",
     ] = Field(description="Pick exactly one of the listed values; use 'other' if none fits")
     guidance_source: str | None = Field(None, description="Guidance file name from the passages provided")
     guidance_page: int | None = None
@@ -111,6 +112,8 @@ Rules:
 - Skip articles that are not negative (share price, product news).
 - Copy URLs exactly from the articles. Never invent articles, dates or facts.
 - Never add up, convert or calculate amounts. Only use amounts exactly as they appear in the articles.
+- Use risk_type 'investigation' ONLY for an ongoing probe or prosecution that has not been resolved.
+  A settled, fined or closed case is NOT an investigation: use 'regulatory fine' or 'money laundering'.
 - Link each finding to the most relevant guidance passage (file name and page), if one applies.
 - The summary may only use facts from your findings.
 - If nothing credible remains, set no_adverse_media to true and return an empty findings list.
@@ -223,6 +226,10 @@ def run_review(company: str, entity: dict | None, hits: list[dict] | None = None
             errors.append(f"Review: dropped finding not about this company: {f.title!r}")
         else:
             item = f.model_dump()
+            text = f"{source.get('title', '')} {source.get('snippet', '')} {f.summary}".lower()
+            if item["risk_type"] == "investigation" and any(w in text for w in SETTLED_WORDS):
+                item["risk_type"] = "regulatory fine"
+                errors.append(f"Review: {f.title!r} relabelled from investigation to regulatory fine (case was settled)")
             bad = unverified_amounts(f.summary, evidence_texts)
             if bad:
                 errors.append(f"Review: amount(s) {bad} not in source; summary of {f.title!r} replaced by source excerpt")

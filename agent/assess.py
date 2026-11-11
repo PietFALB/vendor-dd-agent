@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 
 from rag.retrieve import retrieve
 from tools.amounts import unverified_amounts
+from tools.dates import age_years, event_year
 
 RATINGS = ["Low", "Medium", "High"]
 RECOMMENDATIONS = ["Onboard", "Onboard with conditions", "Escalate", "Do not onboard"]
@@ -19,7 +20,7 @@ STRONG_HIT = 95  # sanctions score from which a hit sets the floor to High
 class RedFlag(BaseModel):
     flag: str = Field(description="Short name of the red flag, e.g. 'Listed on EU sanctions list'")
     category: Literal["sanctions", "ownership or control", "circumvention", "adverse media",
-                      "identity", "data gap", "other"]
+                      "investigation", "identity", "data gap", "other"]
     severity: Literal["Low", "Medium", "High"]
     evidence: str = Field(description="One sentence: what the evidence shows")
     evidence_source: str = Field(description="Exact URL or source name from the EVIDENCE SOURCES list")
@@ -40,6 +41,10 @@ Judge ONLY the evidence below. Rules:
 - No evidence, no flag. Every red flag must cite an exact source from EVIDENCE SOURCES.
 - Never add up, convert or calculate amounts. Use amounts exactly as they appear in the evidence.
 - Give each red flag the year of the underlying event (event_year), if the evidence shows it.
+- An unresolved, ongoing investigation or prosecution is its own red flag, category 'investigation'.
+  Do not merge it into an older, settled case.
+- Events older than 5 years (age_years > 5) weigh less: on their own they support at most a Medium
+  rating, and they are past events, never 'current' or 'ongoing'.
 - Use guidance_ref only with an exact entry from GUIDANCE REFERENCES, otherwise null.
 - Sanctions hits are shown in the evidence, but do NOT create sanctions red flags yourself:
   code adds one per hit. Add the OTHER flags (circumvention, ownership or control, adverse media, identity).
@@ -110,7 +115,8 @@ def assess(state: dict) -> dict:
         "sanctions_hits": [{"name": h["name"], "score": h["score"], "programs": h["programs"],
                             "matched_via": h.get("matched_via"), "source": h["url"]} for h in hits],
         "adverse_media": [{"title": n["title"], "date": n.get("date"), "summary": n["summary"],
-                           "risk_type": n["risk_type"], "source": n["url"]} for n in news],
+                           "risk_type": n["risk_type"], "year": event_year(n.get("date")),
+                           "age_years": age_years(n.get("date")), "source": n["url"]} for n in news],
         "review_summary": state.get("review_summary"),
         "article_excerpts": [t[:400] for t in state.get("evidence_texts", [])],
         "guidance": [{"ref": f"{g['source']} p.{g['page']}", "text": g["text"][:400]} for g in guidance],
