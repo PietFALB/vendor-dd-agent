@@ -5,6 +5,7 @@ import re
 import requests
 
 from tools.base import ToolResult
+from tools.http import get_with_retry
 
 BASE = os.environ.get("KVK_BASE_URL", "https://api.kvk.nl/test/api/v1")
 
@@ -14,7 +15,7 @@ def get_kvk_profile(kvk_number: str) -> ToolResult:
     if not re.fullmatch(r"\d{8}", str(kvk_number or "")):
         return ToolResult(ok=False, error=f"Invalid KvK number: {kvk_number!r} (must be 8 digits)", source=url)
     try:
-        r = requests.get(url, headers={"apikey": os.environ.get("KVK_API_KEY", "")}, timeout=15)
+        r = get_with_retry(url, headers={"apikey": os.environ.get("KVK_API_KEY", "")}, timeout=15)
         if r.status_code == 401:
             return ToolResult(ok=False, error="KvK rejected the API key (401)", source=url)
         if r.status_code == 404:

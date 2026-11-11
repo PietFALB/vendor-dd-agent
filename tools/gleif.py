@@ -3,6 +3,7 @@ import requests
 from rapidfuzz import fuzz
 
 from tools.base import ToolResult
+from tools.http import get_with_retry
 from tools.sanctions import normalize
 
 BASE = "https://api.gleif.org/api/v1/lei-records"
@@ -26,7 +27,7 @@ def _summary(record: dict) -> dict:
 
 def _parent(lei: str, kind: str) -> dict | None:
     """kind = 'direct-parent' or 'ultimate-parent'. None if not reported."""
-    r = requests.get(f"{BASE}/{lei}/{kind}", timeout=15)
+    r = get_with_retry(f"{BASE}/{lei}/{kind}", timeout=15)
     if r.status_code == 404:
         return None
     r.raise_for_status()
@@ -43,7 +44,7 @@ def _similarity(query: str, rec: dict) -> float:
 
 def search_gleif(name: str) -> ToolResult:
     try:
-        r = requests.get(BASE, params={"filter[fulltext]": name, "page[size]": 10}, timeout=15)
+        r = get_with_retry(BASE, params={"filter[fulltext]": name, "page[size]": 10}, timeout=15)
         r.raise_for_status()
         records = [_summary(rec) for rec in r.json().get("data", [])]
         if not records:
