@@ -80,20 +80,33 @@ def _freeze_guidance() -> str | None:
 
 
 def _floor(state: dict) -> tuple[str, str, str | None]:
-    """Minimum rating and recommendation that code enforces, with the reason."""
+    """Minimum rating and recommendation enforced by code: the strictest of ALL rules that apply."""
+    rules = []
     for h in state.get("sanctions_hits", []):
         roles = " ".join(h.get("matched_via", []))
         if h["score"] >= STRONG_HIT and ("[company]" in roles or "[name as given]" in roles):
             if re.search(r"\b(EU|GB)-", h.get("programs", "")):
-                return ("High", "Do not onboard",
-                        f"Strong match on an EU/UK-listed entity ({h['name']}, score {h['score']}); "
-                        "making funds or economic resources available to it is prohibited.")
-            return "High", "Escalate", f"Strong sanctions match on the company itself ({h['name']}, score {h['score']})."
-    if state.get("sanctions_hits"):
-        return "Medium", "Onboard with conditions", "Possible sanctions match that needs manual review."
+                rules.append(("High", "Do not onboard",
+                              f"Strong match on an EU/UK-listed entity ({h['name']}, score {h['score']}); "
+                              "making funds or economic resources available to it is prohibited."))
+            else:
+                rules.append(("High", "Escalate",
+                              f"Strong sanctions match on the company itself ({h['name']}, score {h['score']})."))
+    if state.get("sanctions_hits") and not rules:
+        rules.append(("Medium", "Escalate", "Possible sanctions match that needs manual review before onboarding."))
     if not state.get("screening_complete", True):
-        return "Medium", "Onboard with conditions", "Sanctions screening was incomplete."
-    return "Low", "Onboard", None
+        rules.append(("Medium", "Escalate", "Sanctions screening was incomplete; complete it before onboarding."))
+    entity = state.get("entity") or {}
+    if not entity.get("lei") and not entity.get("kvk_profile"):
+        rules.append(("Medium", "Escalate", "Identity not verified: no LEI record and no company register profile found."))
+    if not state.get("media_complete", True):
+        rules.append(("Medium", "Onboard with conditions", "Adverse media check incomplete: the news search failed."))
+
+    if not rules:
+        return "Low", "Onboard", None
+    rating = max((r[0] for r in rules), key=RATINGS.index)
+    recommendation = max((r[1] for r in rules), key=RECOMMENDATIONS.index)
+    return rating, recommendation, " ".join(r[2] for r in rules)
 
 
 def assess(state: dict) -> dict:
@@ -173,12 +186,37 @@ def assess(state: dict) -> dict:
             "guidance_ref": freeze_ref,
             "event_year": None,
         })
+    ent = state.get("entity") or {}
+    if not ent.get("lei") and not ent.get("kvk_profile"):
+        flags = [f for f in flags if f["category"] != "identity"]
+        code_flags.append({
+            "flag": "Company identity could not be verified",
+            "category": "identity",
+            "severity": "Medium",
+            "evidence": "No LEI record in GLEIF and no company register (KvK) profile found for the name as given.",
+            "evidence_source": "GLEIF",
+            "guidance_ref": None,
+            "event_year": None,
+        })
     flags = code_flags + flags
+
+    # A settled case is not an open investigation: relabel before merging
+    settled_words = ("settle", "settled", "fined", "agreed to pay", "paid a fine", "penalty")
+    for f in flags:
+        text = f"{f['flag']} {f['evidence']}".lower()
+        if f["category"] == "investigation" and any(w in text for w in settled_words):
+            f["category"] = "adverse media"
+            errors.append(f"Assessment: {f['flag']!r} relabelled from investigation to adverse media (case was settled)")
 
     # Merge red flags about the same event (same category and year), keeping all sources
     merged = {}
     for f in flags:
-        key = (f["category"], f["event_year"]) if f.get("event_year") else (f["category"], f["flag"].lower())
+        if f["category"] == "sanctions" or not f.get("event_year"):
+            key = (f["category"], f["flag"].lower())        # sanctions: one flag per listed entity
+        elif f["category"] == "investigation":
+            key = ("investigation", f["event_year"])      # open cases stay apart from settled ones
+        else:
+            key = ("event", f["event_year"])              # same year = same event, whatever the category
         if key in merged:
             m = merged[key]
             m["other_sources"].append(f["evidence_source"])

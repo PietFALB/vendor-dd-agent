@@ -50,7 +50,9 @@ def screen_sanctions(name: str, threshold: int = 85) -> ToolResult:
         return ToolResult(ok=False, error="Empty name", source=source)
     try:
         df, names, owners = _load()
-        matches = process.extract(normalize(name), names, scorer=fuzz.token_sort_ratio, score_cutoff=threshold, limit=20)
+        query = normalize(name)
+        cutoff = max(threshold, 95) if len(query) < 6 else threshold  # short names: near-exact only
+        matches = process.extract(query, names, scorer=fuzz.token_sort_ratio, score_cutoff=cutoff, limit=20)
         hits, seen = [], set()
         for matched, score, idx in matches:
             row = df.iloc[owners[idx]]

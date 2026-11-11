@@ -8,6 +8,7 @@ class DDState(TypedDict, total=False):
     kvk_number: str | None
     valid: bool                  # set by validate_input; False stops the run
     screening_complete: bool     # False if any sanctions check failed
+    media_complete: bool         # False if the news search failed (not the same as 'nothing found')
 
     # Collected facts (from tools)
     entity: dict | None          # GLEIF + KvK identity, parents

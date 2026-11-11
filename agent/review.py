@@ -142,7 +142,7 @@ def _mentions_company(text: str, names: list[str]) -> bool:
 
 def _collect(messages) -> tuple[dict, dict, list]:
     """What the tools actually returned: articles by URL, guidance by (source, page), and the calls made."""
-    articles, guidance, steps, seen = {}, {}, [], set()
+    articles, guidance, steps, seen, news_errors = {}, {}, [], set(), []
     for msg in messages:
         if isinstance(msg, AIMessage):
             for call in msg.tool_calls or []:
@@ -155,6 +155,9 @@ def _collect(messages) -> tuple[dict, dict, list]:
                 payload = json.loads(msg.content)
             except (TypeError, json.JSONDecodeError):
                 continue
+            if (msg.name == "news_search" and isinstance(payload, dict) and payload.get("error")
+                    and "budget" not in payload["error"].lower()):
+                news_errors.append(payload["error"])
             if not isinstance(payload, list):
                 continue
             if msg.name == "news_search":
@@ -164,7 +167,7 @@ def _collect(messages) -> tuple[dict, dict, list]:
             elif msg.name == "guidance_search":
                 for g in payload:
                     guidance[(g["source"], g["page"])] = g
-    return articles, guidance, steps
+    return articles, guidance, steps, news_errors
 
 
 # ---------------------------------------------------------------- run
@@ -196,7 +199,14 @@ def run_review(company: str, entity: dict | None, hits: list[dict] | None = None
     except Exception as e:
         errors.append(f"Review: research agent failed ({e}); using the evidence found so far.")
 
-    articles, guidance, steps = _collect(last_state["messages"])
+    articles, guidance, steps, news_errors = _collect(last_state["messages"])
+    ran_news = any(s["tool"] == "news_search" for s in steps)
+    media_complete = bool(articles) or (ran_news and not news_errors)
+    if news_errors:
+        errors.append(f"Review: {len(news_errors)} news search(es) failed ({news_errors[0][:100]})"
+                      + ("; adverse media NOT checked." if not articles else "; results may be incomplete."))
+    elif not ran_news:
+        errors.append("Review: no news search was run; adverse media NOT checked.")
 
     # ---- Phase 2: synthesis. One call, no tools, only the evidence that was actually found.
     review = None
@@ -211,7 +221,7 @@ def run_review(company: str, entity: dict | None, hits: list[dict] | None = None
             review = llm.with_structured_output(ReviewResult).invoke(prompt)
         except Exception as e:
             errors.append(f"Review: synthesis failed ({e}).")
-    elif not errors:
+    elif media_complete and not errors:
         errors.append("Review: news search returned no articles.")
 
     # ---- Code checks: the URL must come from the news tool, and the article must name the company.
@@ -247,5 +257,6 @@ def run_review(company: str, entity: dict | None, hits: list[dict] | None = None
         "review_summary": summary,
         "agent_steps": steps,
         "evidence_texts": evidence_texts,
+        "media_complete": media_complete,
         "errors": errors,
     }

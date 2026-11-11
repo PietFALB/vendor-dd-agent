@@ -67,6 +67,8 @@ Each red flag below is ONE event. Describe each event once, even if several arti
 belong to it (e.g. a fine plus disgorgement in one settlement is one settlement, not two fines).
 Use the event year; do not call an event 'current' or 'ongoing' unless the evidence says so.
 Specific steps must refer to a finding in this report. Standard onboarding steps are added separately.
+The absence of findings is NOT proof of good compliance. Never claim 'strong compliance', 'high confidence'
+or similar. If there are material data limitations (e.g. identity not verified), mention them in the summary.
 
 Company: {name}
 Risk rating: {rating}
@@ -213,13 +215,18 @@ def build_report(state: dict) -> str:
     # 5. Adverse media
     lines += [SECTIONS[4], ""]
     searches = len([s for s in state.get("agent_steps", []) if s["tool"] == "news_search"])
+    media_complete = state.get("media_complete", True)
+    if not media_complete:
+        lines += ["**Adverse media check incomplete: the news search failed. "
+                  "Do not treat the absence of findings as clear.**", ""]
     if news:
         for n in news:
             ref = f" Guidance: {n['guidance_source']} p.{n['guidance_page']}." if n.get("guidance_source") else ""
             lines.append(f"- **{n['title']}** ({age_text(n.get('date'))}, {n['risk_type']}). "
                          f"{n['summary']}{ref} [Source]({n['url']})")
     else:
-        lines.append(f"No credible adverse media found ({searches} news searches).")
+        lines.append(f"No credible adverse media found ({searches} news searches)." if media_complete
+                     else "No adverse media could be retrieved.")
     lines.append("")
 
     # 6. Red flags
@@ -268,6 +275,8 @@ def check_report(state: dict) -> list[str]:
         problems.append("missing sanctions data date")
     if not state.get("screening_complete", True) and "Sanctions screening incomplete" not in report:
         problems.append("incomplete screening not stated")
+    if not state.get("media_complete", True) and "Adverse media check incomplete" not in report:
+        problems.append("incomplete adverse media check not stated")
     for e in state.get("errors", []):
         if e[:60] not in report:
             problems.append(f"data limitation not reported: {e[:60]!r}")
