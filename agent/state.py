@@ -5,6 +5,7 @@ from typing import Annotated, TypedDict
 class DDState(TypedDict, total=False):
     # Input
     company_name: str
+    started_at: str              # ISO timestamp of the run, set once by validate_input
     kvk_number: str | None
     valid: bool                  # set by validate_input; False stops the run
     screening_complete: bool     # False if any sanctions check failed

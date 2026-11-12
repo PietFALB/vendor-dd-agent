@@ -4,6 +4,21 @@ the summary, the recommendation text and next steps."""
 import os
 import re
 from datetime import date, datetime
+
+
+def now_local() -> datetime:
+    """Current time in Amsterdam; falls back to the computer's local time (e.g. Windows without tzdata)."""
+    try:
+        from zoneinfo import ZoneInfo
+        return datetime.now(ZoneInfo("Europe/Amsterdam"))
+    except Exception:
+        return datetime.now().astimezone()
+
+
+def run_time(state: dict) -> datetime:
+    """The run's timestamp from the state, so header and file name always match."""
+    ts = state.get("started_at")
+    return datetime.fromisoformat(ts) if ts else now_local()
 from pathlib import Path
 
 from langchain_openai import ChatOpenAI
@@ -155,7 +170,7 @@ def build_report(state: dict) -> str:
     lines = [
         f"# Vendor Due-Diligence Report: {_title(state, entity, name)}",
         "",
-        f"*Generated {date.today().isoformat()} · Review route: {route} · "
+        f"*Generated {run_time(state).strftime('%Y-%m-%d %H:%M:%S %Z')} · Review route: {route} · "
         f"Sources: GLEIF, KvK, OpenSanctions (sanctions data as of {data_date}), "
         f"news search, AML/sanctions guidance corpus*",
         "",
@@ -298,7 +313,7 @@ def check_report(state: dict) -> list[str]:
 
 def save_report(state: dict, ok: bool) -> str:
     slug = re.sub(r"[^A-Za-z0-9]+", "_", state["company_name"]).strip("_") or "company"
-    path = Path("reports") / f"{slug}_{date.today().isoformat()}.md"
+    path = Path("reports") / f"{slug}_{run_time(state).strftime('%Y-%m-%d_%H%M%S')}.md"
     path.parent.mkdir(exist_ok=True)
     text = state.get("report") or ""
     if not ok:

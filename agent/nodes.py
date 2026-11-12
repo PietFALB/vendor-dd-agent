@@ -1,3 +1,4 @@
+from agent.report import now_local
 """Graph nodes for the vendor due-diligence agent."""
 import re
 
@@ -20,7 +21,7 @@ def validate_input(state: DDState) -> dict:
         problems.append("Company name is empty or too short.")
     if kvk and not re.fullmatch(r"\d{8}", kvk):
         problems.append(f"KvK number {kvk!r} must be 8 digits.")
-    return {
+    return {"started_at": now_local().isoformat(timespec="seconds"), 
         "company_name": name,
         "kvk_number": kvk,
         "valid": not problems,
