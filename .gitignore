@@ -4,3 +4,4 @@ data/sanctions/
 __pycache__/
 .DS_Store
 CLAUDE.md
+reports/*_2026-*.md
