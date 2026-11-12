@@ -53,7 +53,7 @@ def resolve_entity(state: DDState) -> dict:
                       "(UBOs) are not verified. Obtain a UBO declaration.")
 
     kvk_number = state.get("kvk_number")
-    if not kvk_number and match and match.get("jurisdiction") == "NL":
+    if not kvk_number and match and match.get("jurisdiction") == "NL" and match.get("country") == "NL":
         kvk_number = match.get("registered_as")
 
     kvk_profile = None

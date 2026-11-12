@@ -20,6 +20,7 @@ def _summary(record: dict) -> dict:
         "entity_status": e.get("status"),
         "registration_status": a["registration"].get("status"),
         "jurisdiction": e.get("jurisdiction"),
+        "category": e.get("category"),  # GENERAL, BRANCH, FUND, ...
         "registered_as": e.get("registeredAs"),  # KvK number for Dutch entities
         "address": ", ".join(e["legalAddress"].get("addressLines", []) + [e["legalAddress"].get("city") or ""]),
         "country": e["legalAddress"].get("country"),
@@ -44,7 +45,8 @@ def _similarity(query: str, rec: dict) -> float:
 
 def _rank(name: str, rec: dict) -> float:
     """Similarity, with a penalty for inactive (merged, dissolved) entities."""
-    return _similarity(name, rec) - (0 if rec["entity_status"] == "ACTIVE" else 15)
+    penalty = (0 if rec["entity_status"] == "ACTIVE" else 15) + (10 if rec.get("category") == "BRANCH" else 0)
+    return _similarity(name, rec) - penalty
 
 
 def _search(params: dict) -> list[dict]:
@@ -59,9 +61,10 @@ def search_gleif(name: str) -> ToolResult:
         records = {rec["lei"]: rec for rec in _search({"filter[fulltext]": name, "page[size]": 25})}
 
         # 2. If nothing matches strongly, try the exact legal name with common legal forms
-        if not records or max(_similarity(name, r) for r in records.values()) < STRONG:
+        # Use the ranking (with branch/inactive penalties), so a branch never counts as 'found'
+        if not records or max(_rank(name, r) for r in records.values()) < STRONG:
             for form in LEGAL_FORMS:
-                for rec in _search({"filter[entity.legalName]": name + form, "page[size]": 5}):
+                for rec in _search({"filter[entity.legalName]": name + form, "page[size]": 50}):
                     records.setdefault(rec["lei"], rec)
 
         if not records:
