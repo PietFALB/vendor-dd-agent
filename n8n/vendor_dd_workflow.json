@@ -1,0 +1,126 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Vendor Due Diligence Check",
+        "formDescription": "Enter a company name. The agent identifies it, screens it against sanctions lists, researches adverse media and returns a cited report. A check takes about a minute.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Company name",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "KvK number",
+              "placeholder": "8 digits"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        0,
+        0
+      ],
+      "id": "597209f2-b7a9-4c84-9709-8f491e108080",
+      "name": "Vendor Due Diligence Check",
+      "webhookId": "3c5cc3c8-ef70-4d71-a8c9-2db46938d181"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/check",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "=     {\n       \"company_name\": \"{{ $json['Company name'] }}\",\n       \"kvk_number\": \"{{ $json['KvK number'] }}\"\n     }",
+        "options": {
+          "timeout": 180000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        224,
+        0
+      ],
+      "id": "8881b851-26f0-4c25-9095-e1a9a7c2510f",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "mode": "markdownToHtml",
+        "markdown": "={{ $json.report_markdown }}",
+        "destinationKey": "report_html",
+        "options": {
+          "literalMidWordUnderscores": true,
+          "tables": true
+        }
+      },
+      "type": "n8n-nodes-base.markdown",
+      "typeVersion": 1,
+      "position": [
+        448,
+        0
+      ],
+      "id": "04849df3-2707-47d5-bcbb-88ee1442efe4",
+      "name": "Markdown"
+    },
+    {
+      "parameters": {
+        "operation": "completion",
+        "respondWith": "showText",
+        "responseText": "=   <h2>{{ $('HTTP Request').item.json.risk_rating }} · {{ $('HTTP Request').item.json.recommendation }}</h2>\n   <p><em>{{ $('HTTP Request').item.json.minimum_rule }}</em></p>\n   <hr>\n   {{ $json.report_html }}"
+      },
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        672,
+        0
+      ],
+      "id": "af6941dd-95de-4edf-a2d1-d33585e21dbc",
+      "name": "Form",
+      "webhookId": "efbd6551-4da1-4f05-b770-fe9df6f340e5"
+    }
+  ],
+  "connections": {
+    "Vendor Due Diligence Check": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Markdown",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Markdown": {
+      "main": [
+        [
+          {
+            "node": "Form",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "717b8190bc533d1abca47c480e6fd882d6c8fd624a1a188edf5c18b426da10bb"
+  }
+}
