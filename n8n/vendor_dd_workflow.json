@@ -32,6 +32,8 @@
       "parameters": {
         "method": "POST",
         "url": "http://127.0.0.1:8000/check",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "=     {\n       \"company_name\": \"{{ $json['Company name'] }}\",\n       \"kvk_number\": \"{{ $json['KvK number'] }}\"\n     }",
@@ -46,7 +48,13 @@
         0
       ],
       "id": "8881b851-26f0-4c25-9095-e1a9a7c2510f",
-      "name": "HTTP Request"
+      "name": "HTTP Request",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "1KJL3Mtwq8eJ2i0J",
+          "name": "Header Auth account 2"
+        }
+      }
     },
     {
       "parameters": {
