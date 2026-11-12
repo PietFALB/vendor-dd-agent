@@ -37,10 +37,27 @@ def _parent(lei: str, kind: str) -> dict | None:
     return _summary(data) if data else None
 
 
+GENERIC_PREFIXES = ("koninklijke ", "royal ")  # 'Koninklijke Ahold Delhaize' = 'Ahold Delhaize'
+
+
+def _clean(name: str) -> str:
+    """normalize() plus GLEIF-only stripping of generic prefixes (not used for sanctions)."""
+    s = normalize(name).strip()
+    for prefix in GENERIC_PREFIXES:
+        if s.startswith(prefix):
+            s = s[len(prefix):]
+    return s
+
+
 def _similarity(query: str, rec: dict) -> float:
     """Best name similarity between the query and the record's legal or other names."""
-    q = normalize(query)
-    return max(fuzz.token_sort_ratio(q, normalize(n)) for n in [rec["legal_name"], *rec["other_names"]])
+    q = _clean(query)
+    return max(fuzz.token_sort_ratio(q, _clean(n)) for n in [rec["legal_name"], *rec["other_names"]])
+
+
+def _tiebreak(query: str, rec: dict) -> float:
+    """Raw closeness of the full name, so 'Heineken N.V.' beats 'Heineken Holding N.V.' on a tie."""
+    return fuzz.ratio(query.lower(), rec["legal_name"].lower())
 
 
 def _rank(name: str, rec: dict) -> float:
@@ -70,7 +87,7 @@ def search_gleif(name: str) -> ToolResult:
         if not records:
             return ToolResult(ok=True, data={"match": None, "candidates": []}, source=BASE)
 
-        scored = sorted(records.values(), key=lambda rec: _rank(name, rec), reverse=True)
+        scored = sorted(records.values(), key=lambda rec: (_rank(name, rec), _tiebreak(name, rec)), reverse=True)
         best = scored[0]
         best["match_score"] = round(_similarity(name, best), 1)
         best["direct_parent"] = _parent(best["lei"], "direct-parent")
