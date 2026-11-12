@@ -6,7 +6,7 @@ from tools.http import get_with_retry
 from tools.sanctions import normalize
 
 BASE = "https://api.gleif.org/api/v1/lei-records"
-LEGAL_FORMS = ["", " N.V.", " B.V.", " Limited", " Ltd", " PLC", " AG", " SA", " GmbH", " Inc."]
+LEGAL_FORMS = ["", " N.V.", " B.V.", " Limited", " Ltd", " PLC", " plc", " AG", " SA", " GmbH", " Inc."]
 STRONG = 95  # below this, also try exact legal-name searches
 
 
@@ -55,9 +55,10 @@ def _similarity(query: str, rec: dict) -> float:
     return max(fuzz.token_sort_ratio(q, _clean(n)) for n in [rec["legal_name"], *rec["other_names"]])
 
 
-def _tiebreak(query: str, rec: dict) -> float:
-    """Raw closeness of the full name, so 'Heineken N.V.' beats 'Heineken Holding N.V.' on a tie."""
-    return fuzz.ratio(query.lower(), rec["legal_name"].lower())
+def _tiebreak(query: str, rec: dict) -> tuple:
+    """On equal rank: prefer a Dutch entity (this agent screens Dutch vendors), then the closest full name.
+    'Koninklijke Philips N.V.' beats 'Philips GmbH'; 'Heineken N.V.' beats 'Heineken Holding N.V.'."""
+    return (rec.get("country") == "NL", fuzz.ratio(query.lower(), rec["legal_name"].lower()))
 
 
 def _rank(name: str, rec: dict) -> float:
@@ -77,12 +78,12 @@ def search_gleif(name: str) -> ToolResult:
         # 1. Full-text search: broad, but noisy for short or common names
         records = {rec["lei"]: rec for rec in _search({"filter[fulltext]": name, "page[size]": 25})}
 
-        # 2. If nothing matches strongly, try the exact legal name with common legal forms
-        # Use the ranking (with branch/inactive penalties), so a branch never counts as 'found'
-        if not records or max(_rank(name, r) for r in records.values()) < STRONG:
-            for form in LEGAL_FORMS:
-                for rec in _search({"filter[entity.legalName]": name + form, "page[size]": 50}):
-                    records.setdefault(rec["lei"], rec)
+        # 2. Always also try exact legal names. For large groups the full-text top 25 often misses
+        #    the group company itself (Koninklijke Philips N.V., Shell plc) among its subsidiaries.
+        exact_names = [name + form for form in LEGAL_FORMS] + [f"Koninklijke {name} N.V."]
+        for legal_name in exact_names:
+            for rec in _search({"filter[entity.legalName]": legal_name, "page[size]": 50}):
+                records.setdefault(rec["lei"], rec)
 
         if not records:
             return ToolResult(ok=True, data={"match": None, "candidates": []}, source=BASE)
