@@ -38,8 +38,11 @@ def main():
     chunks = splitter.split_documents(docs)
     print(f"Split into {len(chunks)} chunks, uploading...")
 
+    # Fixed IDs make the ingest idempotent: a re-run overwrites chunks instead of duplicating them
+    ids = [f"{c.metadata['source']}-p{c.metadata['page']}-{i}" for i, c in enumerate(chunks)]
     PineconeVectorStore.from_documents(
         chunks,
+        ids=ids,
         embedding=OpenAIEmbeddings(model="text-embedding-3-small"),
         index_name=INDEX_NAME,
     )

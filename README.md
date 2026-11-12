@@ -29,3 +29,7 @@ Download the sanctions data (simplified CSV) from https://www.opensanctions.org/
 ```
 python test_apis.py
 ```
+
+## Password
+
+Optional: set APP_PASSWORD in .env to protect the app with a password.” Also add APP_PASSWORD= (without a value) to .env.example.
