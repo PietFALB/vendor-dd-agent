@@ -13,3 +13,6 @@ requests
 python-dotenv
 pydantic
 pandas
+streamlit
+fastapi
+uvicorn
