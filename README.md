@@ -6,6 +6,25 @@ It can be run from the terminal, a Streamlit app, a REST API, or an n8n form.
 
 > This is an automated pre-screening to support, not replace, a compliance officer. It is not legal advice.
 
+## Project deliverables
+
+| | |
+| --- | --- |
+| **Demo video** |    [Watch the demo](https://youtu.be/CCxDiLiPhcM) |
+| **Slides (PDF)** | [`powerpoint_slides/DDA_PPT.pdf`](powerpoint_slides/DDA_PPT.pdf) |
+| **Stack decision** | [`stack_decision.md`](stack_decision.md): LangGraph primary, n8n secondary |
+| **GTM sprints** | [`gtm_future_sprints.md`](gtm_future_sprints.md) |
+| **Sample reports** | [`reports/final_Sberbank_2026-11-11.md`](reports/final_Sberbank_2026-11-11.md) (sanctions branch), [`reports/final_ING_Groep_2026-11-11.md`](reports/final_ING_Groep_2026-11-11.md), [`reports/final_Xyzzy_Holding_BV_2026-11-11.md`](reports/final_Xyzzy_Holding_BV_2026-11-11.md) (company that does not exist) |
+| **Entry point** | `python main.py "Company name"` (see [Running it](#running-it)) |
+
+**Streamlit app, Sberbank result**
+
+![Streamlit app showing a High · Do not onboard result for Sberbank](screenshots/DDA%20_streamlit_sberbank.png)
+
+**n8n workflow: form → agent API → report**
+
+![n8n workflow with Form Trigger, HTTP Request, Markdown and Form Ending nodes](screenshots/DDA_n8n_overview.png)
+
 ## What a report contains
 
 1. Summary and risk rating (Low / Medium / High)
@@ -196,14 +215,24 @@ rag/
   retrieve.py     Top-4 retrieval from Pinecone
 tests/
   regression_gleif.py  Entity resolution for 7 known companies
+  smoke_tools.py       Quick check of each tool
+  debug_review.py      Runs the review step on its own
 data/corpus/      Guidance: DNB Wwft guidance, EC asset-freeze FAQ and
                   circumvention/EDD guidance, FATF risk-based approach
-docs/             Design decisions
-n8n/              n8n workflow
-reports/          Sample reports
+docs/             Design decisions (chunking, LLM split)
+n8n/              n8n workflow (no credentials)
+reports/          Sample reports (final_*); earlier runs in reports/archive/
+screenshots/      Streamlit, n8n and report screenshots
+powerpoint_slides/  Presentation slides (PDF)
+pipeline/         Pipeline diagram (PDF)
+notes/            Sample API responses and the workflow diagram
+.streamlit/       Streamlit theme matching the slides
 main.py           Command line
 app.py            Streamlit app
 api.py            FastAPI
+test_apis.py      Checks every API key and the sanctions file
+stack_decision.md  Why LangGraph, why n8n is secondary
+gtm_future_sprints.md  Next three go-to-market sprints
 ```
 
 Go-to-market plan: [`gtm_future_sprints.md`](gtm_future_sprints.md).
